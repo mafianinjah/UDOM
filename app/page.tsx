@@ -1,11 +1,11 @@
-import { Package, CheckCircle2, Clock, XCircle, TrendingUp, Building2 } from "lucide-react"
+import { Package, CheckCircle2, Clock, XCircle, Building2, ArrowRightLeft, Truck } from "lucide-react"
 import { Card, Badge, SectionHeading } from "@/components/ui"
 import {
   deliveries,
-  students,
   hostels,
   statusColors,
   categoryColors,
+  typeColors,
   type DeliveryStatus,
   type DeliveryCategory,
 } from "@/lib/data"
@@ -14,6 +14,7 @@ import { formatDateTime } from "@/lib/utils"
 const statusIcons: Record<DeliveryStatus, typeof Package> = {
   Pending: Clock,
   Received: Package,
+  "In Transit": Truck,
   Collected: CheckCircle2,
   Cancelled: XCircle,
 }
@@ -22,13 +23,15 @@ export default function DashboardPage() {
   const total = deliveries.length
   const pending = deliveries.filter((d) => d.status === "Pending").length
   const received = deliveries.filter((d) => d.status === "Received").length
-  const collected = deliveries.filter((d) => d.status === "Collected").length
+  const inTransit = deliveries.filter((d) => d.status === "In Transit").length
+  const internal = deliveries.filter((d) => d.deliveryType === "Internal").length
+  const external = deliveries.filter((d) => d.deliveryType === "External").length
 
   const stats = [
     { label: "Total Deliveries", value: total, icon: Package, tone: "text-primary bg-primary/10" },
-    { label: "Awaiting Collection", value: pending + received, icon: Clock, tone: "text-warning-foreground bg-warning/20" },
-    { label: "Collected", value: collected, icon: CheckCircle2, tone: "text-success bg-success/15" },
-    { label: "Registered Students", value: students.length, icon: TrendingUp, tone: "text-accent-foreground bg-accent/20" },
+    { label: "Awaiting Collection", value: pending + received + inTransit, icon: Clock, tone: "text-warning-foreground bg-warning/20" },
+    { label: "Internal (on-campus)", value: internal, icon: ArrowRightLeft, tone: "text-primary bg-primary/10" },
+    { label: "External (off-campus)", value: external, icon: Truck, tone: "text-accent-foreground bg-accent/20" },
   ]
 
   const categories: DeliveryCategory[] = ["Food", "Parcel", "Documents", "Medicine", "Others"]
@@ -83,10 +86,11 @@ export default function DashboardPage() {
                       {d.deliveryId} · {d.studentName}
                     </p>
                     <p className="truncate text-xs text-muted-foreground">
-                      {d.courier} · {formatDateTime(d.createdAt)}
+                      {d.origin} → {d.destination} · {formatDateTime(d.createdAt)}
                     </p>
                   </div>
                   <div className="flex shrink-0 items-center gap-2">
+                    <Badge className={typeColors[d.deliveryType]}>{d.deliveryType}</Badge>
                     <Badge className={categoryColors[d.category]}>{d.category}</Badge>
                     <Badge className={statusColors[d.status]}>{d.status}</Badge>
                   </div>

@@ -1,42 +1,51 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { Search, Plus, Check, X } from "lucide-react"
+import { Search, Plus, Check, X, ArrowRight } from "lucide-react"
 import { Card, Badge, SectionHeading } from "@/components/ui"
 import {
   deliveries as seedDeliveries,
   students,
   couriers,
   guards,
+  campusLocations,
   statusColors,
   categoryColors,
+  typeColors,
   type Delivery,
   type DeliveryStatus,
   type DeliveryCategory,
+  type DeliveryType,
 } from "@/lib/data"
 import { formatDateTime, cn } from "@/lib/utils"
 
-const statuses: (DeliveryStatus | "All")[] = ["All", "Pending", "Received", "Collected", "Cancelled"]
+const statuses: (DeliveryStatus | "All")[] = ["All", "Pending", "Received", "In Transit", "Collected", "Cancelled"]
+const typeFilters: (DeliveryType | "All")[] = ["All", "Internal", "External"]
 const categories: DeliveryCategory[] = ["Food", "Parcel", "Documents", "Medicine", "Others"]
 
 export default function DeliveriesPage() {
   const [list, setList] = useState<Delivery[]>(seedDeliveries)
   const [query, setQuery] = useState("")
   const [status, setStatus] = useState<DeliveryStatus | "All">("All")
+  const [typeFilter, setTypeFilter] = useState<DeliveryType | "All">("All")
   const [showForm, setShowForm] = useState(false)
+  const [formType, setFormType] = useState<DeliveryType>("External")
 
   const filtered = useMemo(() => {
     return list.filter((d) => {
       const matchesStatus = status === "All" || d.status === status
+      const matchesType = typeFilter === "All" || d.deliveryType === typeFilter
       const q = query.toLowerCase()
       const matchesQuery =
         !q ||
         d.deliveryId.toLowerCase().includes(q) ||
         d.studentName.toLowerCase().includes(q) ||
-        d.courier.toLowerCase().includes(q)
-      return matchesStatus && matchesQuery
+        d.courier.toLowerCase().includes(q) ||
+        d.origin.toLowerCase().includes(q) ||
+        d.destination.toLowerCase().includes(q)
+      return matchesStatus && matchesType && matchesQuery
     })
-  }, [list, query, status])
+  }, [list, query, status, typeFilter])
 
   function updateStatus(id: string, newStatus: DeliveryStatus) {
     setList((prev) =>
@@ -59,6 +68,9 @@ export default function DeliveriesPage() {
       deliveryId: `D-${1043 + list.length}`,
       student: regNumber,
       studentName: student?.fullName ?? "Unknown",
+      deliveryType: form.get("deliveryType") as DeliveryType,
+      origin: String(form.get("origin")),
+      destination: String(form.get("destination")),
       courier: String(form.get("courier")),
       category: form.get("category") as DeliveryCategory,
       status: "Pending",
@@ -72,11 +84,20 @@ export default function DeliveriesPage() {
     setShowForm(false)
   }
 
+  // Internal deliveries move between two campus premises; external ones arrive from off-campus.
+  const originOptions =
+    formType === "External" ? campusLocations.filter((l) => l.kind === "External") : campusLocations.filter((l) => l.kind !== "External")
+  const destinationOptions = campusLocations.filter((l) => l.kind !== "External")
+  const courierOptions =
+    formType === "Internal"
+      ? couriers.filter((c) => c.company === "UDOM Internal Dispatch")
+      : couriers.filter((c) => c.company !== "UDOM Internal Dispatch")
+
   return (
     <div className="space-y-6">
       <SectionHeading
         title="Deliveries"
-        description="Register incoming deliveries and track their collection status."
+        description="Track internal (block-to-block, college-to-college) and external (off-campus to premises) deliveries."
         action={
           <button
             type="button"
@@ -92,12 +113,22 @@ export default function DeliveriesPage() {
       {showForm ? (
         <Card className="p-6">
           <h2 className="text-base font-semibold">Register New Delivery</h2>
-          <form
-            action={registerDelivery}
-            className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2"
-          >
+          <form action={registerDelivery} className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Student</span>
+              <span className="font-medium">Delivery Type</span>
+              <select
+                name="deliveryType"
+                required
+                value={formType}
+                onChange={(e) => setFormType(e.target.value as DeliveryType)}
+                className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+              >
+                <option value="External">External (off-campus → premises)</option>
+                <option value="Internal">Internal (block/college → block/college)</option>
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium">Recipient (Student)</span>
               <select name="student" required className="rounded-md border border-input bg-background px-3 py-2 text-sm">
                 {students.map((s) => (
                   <option key={s.regNumber} value={s.regNumber}>
@@ -107,9 +138,29 @@ export default function DeliveriesPage() {
               </select>
             </label>
             <label className="flex flex-col gap-1.5 text-sm">
-              <span className="font-medium">Courier</span>
+              <span className="font-medium">Origin</span>
+              <select name="origin" required className="rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {originOptions.map((l) => (
+                  <option key={l.locationId} value={l.name}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium">Destination</span>
+              <select name="destination" required className="rounded-md border border-input bg-background px-3 py-2 text-sm">
+                {destinationOptions.map((l) => (
+                  <option key={l.locationId} value={l.name}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1.5 text-sm">
+              <span className="font-medium">Carrier</span>
               <select name="courier" required className="rounded-md border border-input bg-background px-3 py-2 text-sm">
-                {couriers.map((c) => (
+                {courierOptions.map((c) => (
                   <option key={c.courierId} value={c.company}>
                     {c.company} — {c.name}
                   </option>
@@ -171,27 +222,44 @@ export default function DeliveriesPage() {
             <input
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search by ID, student, or courier..."
+              placeholder="Search by ID, student, carrier, or location..."
               className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm"
             />
           </div>
           <div className="flex flex-wrap gap-1.5">
-            {statuses.map((s) => (
+            {typeFilters.map((t) => (
               <button
-                key={s}
+                key={t}
                 type="button"
-                onClick={() => setStatus(s)}
+                onClick={() => setTypeFilter(t)}
                 className={cn(
                   "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
-                  status === s
-                    ? "bg-primary text-primary-foreground"
+                  typeFilter === t
+                    ? "bg-accent text-accent-foreground"
                     : "bg-secondary text-secondary-foreground hover:bg-secondary/70",
                 )}
               >
-                {s}
+                {t === "All" ? "All Types" : t}
               </button>
             ))}
           </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-1.5">
+          {statuses.map((s) => (
+            <button
+              key={s}
+              type="button"
+              onClick={() => setStatus(s)}
+              className={cn(
+                "rounded-md px-3 py-1.5 text-xs font-medium transition-colors",
+                status === s
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-secondary text-secondary-foreground hover:bg-secondary/70",
+              )}
+            >
+              {s}
+            </button>
+          ))}
         </div>
       </Card>
 
@@ -201,11 +269,12 @@ export default function DeliveriesPage() {
             <thead>
               <tr className="border-b border-border bg-secondary/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
                 <th className="px-4 py-3 font-medium">ID</th>
-                <th className="px-4 py-3 font-medium">Student</th>
-                <th className="px-4 py-3 font-medium">Courier</th>
+                <th className="px-4 py-3 font-medium">Type</th>
+                <th className="px-4 py-3 font-medium">Route</th>
+                <th className="px-4 py-3 font-medium">Recipient</th>
+                <th className="px-4 py-3 font-medium">Carrier</th>
                 <th className="px-4 py-3 font-medium">Category</th>
                 <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Received</th>
                 <th className="px-4 py-3 font-medium">Actions</th>
               </tr>
             </thead>
@@ -213,6 +282,16 @@ export default function DeliveriesPage() {
               {filtered.map((d) => (
                 <tr key={d.deliveryId} className="hover:bg-secondary/30">
                   <td className="px-4 py-3 font-medium">{d.deliveryId}</td>
+                  <td className="px-4 py-3">
+                    <Badge className={typeColors[d.deliveryType]}>{d.deliveryType}</Badge>
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-1.5 text-xs">
+                      <span className="max-w-32 truncate text-muted-foreground">{d.origin}</span>
+                      <ArrowRight className="h-3 w-3 shrink-0 text-muted-foreground" />
+                      <span className="max-w-32 truncate font-medium">{d.destination}</span>
+                    </div>
+                  </td>
                   <td className="px-4 py-3">
                     <div className="font-medium">{d.studentName}</div>
                     <div className="text-xs text-muted-foreground">{d.student}</div>
@@ -224,11 +303,8 @@ export default function DeliveriesPage() {
                   <td className="px-4 py-3">
                     <Badge className={statusColors[d.status]}>{d.status}</Badge>
                   </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
-                    {d.receivedAt ? formatDateTime(d.receivedAt) : "—"}
-                  </td>
                   <td className="px-4 py-3">
-                    {d.status === "Pending" || d.status === "Received" ? (
+                    {d.status === "Pending" || d.status === "Received" || d.status === "In Transit" ? (
                       <div className="flex gap-1.5">
                         <button
                           type="button"
@@ -253,7 +329,7 @@ export default function DeliveriesPage() {
               ))}
               {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-10 text-center text-sm text-muted-foreground">
+                  <td colSpan={8} className="px-4 py-10 text-center text-sm text-muted-foreground">
                     No deliveries match your filters.
                   </td>
                 </tr>

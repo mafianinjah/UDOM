@@ -42,6 +42,27 @@ CREATE TABLE hostel (
 ) ENGINE=InnoDB;
 
 -- -----------------------------------------------------------------------------
+-- Table: campus_location
+-- Every physical premise that can be an origin or destination of a delivery:
+-- hostels, colleges, offices, plus a single 'External' node that represents any
+-- off-campus sender. This is what lets the system model BOTH internal deliveries
+-- (block-to-block, college-to-college) AND external deliveries (off-campus ->
+-- university premises) using the same delivery table.
+-- -----------------------------------------------------------------------------
+CREATE TABLE campus_location (
+  location_id   CHAR(7),                          -- e.g. LOC-H01, LOC-C01, LOC-EXT
+  location_name VARCHAR(80) NOT NULL,
+  location_kind ENUM('Hostel','College','Office','External') NOT NULL,
+  zone          VARCHAR(40) NOT NULL,             -- block/area, or 'Off-campus'
+  hostel_id     CHAR(5) NULL,                     -- set when the location is a hostel
+  PRIMARY KEY (location_id),
+  CONSTRAINT uq_location_name UNIQUE (location_name),
+  CONSTRAINT fk_location_hostel FOREIGN KEY (hostel_id)
+    REFERENCES hostel (hostel_id)
+    ON UPDATE CASCADE ON DELETE SET NULL
+) ENGINE=InnoDB;
+
+-- -----------------------------------------------------------------------------
 -- Table: student
 -- Student registration data. Each student belongs to exactly one hostel.
 -- room_number is unique within a hostel (composite uniqueness).
